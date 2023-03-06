@@ -15,7 +15,7 @@ To migrate an existing Windows VM from Hyper-V to Proxmox (QEMU) see [Windows: P
 To download all scripts into your `$env:temp` folder:
 
 ```powershell
-iex (iwr 'bit.ly/h-v-a' -UseBasicParsing)
+iex (iwr 'https://raw.githubusercontent.com/ezhische/Hyper-V-Automation/master/bootstrap.ps1' -UseBasicParsing)
 ```
 
 

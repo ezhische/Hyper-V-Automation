@@ -113,6 +113,7 @@ $vmmsSettings = gwmi -namespace root\virtualization\v2 Msvm_VirtualSystemManagem
 $vhdxPath = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD\$VMName.vhdx"
 $vhdxPathFolder = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD"
 $metadataIso = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD\$VMName-metadata.iso"
+$VMpath = Join-Path $vmmsSettings.DefaultExternalDataRoot "$VMName"
 
 # Convert cloud image to VHDX
 Write-Verbose 'Creating VHDX from cloud image...'
@@ -131,7 +132,8 @@ if ($VHDXSizeBytes) {
 
 # Create VM
 Write-Verbose 'Creating VM...'
-$vm = New-VM -Name $VMName -Generation 2 -MemoryStartupBytes $MemoryStartupBytes -VHDPath $vhdxPath -SwitchName $SwitchName
+New-Item -Path $VMpath -Force -ItemType "directory"
+$vm = New-VM -Name $VMName -Path $VMpath -Generation 2 -MemoryStartupBytes $MemoryStartupBytes -VHDPath $vhdxPath -SwitchName $SwitchName
 $vm | Set-VMProcessor -Count $ProcessorCount
 $vm | Get-VMIntegrationService -Name "Guest Service Interface" | Enable-VMIntegrationService
 $vm | Set-VMMemory -DynamicMemoryEnabled:$EnableDynamicMemory.IsPresent

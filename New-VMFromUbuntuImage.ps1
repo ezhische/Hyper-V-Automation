@@ -24,7 +24,7 @@ param(
     [Parameter(Mandatory=$true, ParameterSetName='RootPublicKey')]
     [string]$RootPublicKey,
 
-    [uint64]$VHDXSizeBytes,
+    [uint64]$VHDXSizeBytes = 10GB,
 
     [int64]$MemoryStartupBytes = 1GB,
 
@@ -32,7 +32,7 @@ param(
 
     [int64]$ProcessorCount = 2,
 
-    [string]$SwitchName = 'SWITCH',
+    [string]$SwitchName = 'Virtual Switch',
 
     [ValidateScript({
         if ($_ -match '^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$') {
@@ -92,7 +92,9 @@ param(
 
     [string]$SecondaryVlanId,
 
-    [switch]$InstallDocker
+    [switch]$InstallDocker,
+    
+    [switch]$AddToCluster
 )
 
 $ErrorActionPreference = 'Stop'
@@ -108,11 +110,13 @@ function Normalize-MacAddress ([string]$value) {
 # Get default VHD path (requires administrative privileges)
 $vmms = gwmi -namespace root\virtualization\v2 Msvm_VirtualSystemManagementService
 $vmmsSettings = gwmi -namespace root\virtualization\v2 Msvm_VirtualSystemManagementServiceSettingData
-$vhdxPath = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName.vhdx"
-$metadataIso = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName-metadata.iso"
+$vhdxPath = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD\$VMName.vhdx"
+$vhdxPathFolder = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD"
+$metadataIso = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD\$VMName-metadata.iso"
 
 # Convert cloud image to VHDX
 Write-Verbose 'Creating VHDX from cloud image...'
+New-Item -Path $vhdxPathFolder -Force -ItemType "directory"
 $ErrorActionPreference = 'Continue'
 & {
     & qemu-img.exe convert -f qcow2 $SourcePath -O vhdx -o subformat=dynamic $vhdxPath
@@ -371,6 +375,11 @@ Wait-VM -Name $VMName -For Heartbeat
 # Removes DVD and metadata.iso
 $dvd | Remove-VMDvdDrive
 $metadataIso | Remove-Item -Force
+
+If ($AddToCluster){
+Write-Verbose 'Adding to Cluster'
+Add-ClusterVirtualMachineRole -VirtualMachine $VMName
+}
 
 # Return the VM created.
 Write-Verbose 'All done!'

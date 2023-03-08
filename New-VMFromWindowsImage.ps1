@@ -28,11 +28,13 @@ param(
 
     [int64]$VMProcessorCount = 2,
 
-    [string]$VMSwitchName = 'SWITCH',
+    [string]$VMSwitchName = 'Virtual Switch',
 
     [string]$VMMacAddress,
 
-    [string]$Locale = 'en-US'
+    [string]$Locale = 'en-US',
+    
+    [switch]$AddToCluster
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,14 +42,14 @@ $ErrorActionPreference = 'Stop'
 # Get default VHD path (requires administrative privileges)
 $vmms = gwmi -namespace root\virtualization\v2 Msvm_VirtualSystemManagementService
 $vmmsSettings = gwmi -namespace root\virtualization\v2 Msvm_VirtualSystemManagementServiceSettingData
-$vhdxPath = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName.vhdx"
+$vhdxPath = Join-Path $vmmsSettings.DefaultVirtualHardDiskPath "$VMName\VHD\$VMName.vhdx"
 
 # Create VHDX from ISO image
 .\New-VHDXFromWindowsImage.ps1 -SourcePath $SourcePath -Edition $Edition -ComputerName $VMName -VHDXSizeBytes $VHDXSizeBytes -VHDXPath $vhdxPath -AdministratorPassword $AdministratorPassword -Version $Version -Locale $Locale
 
 # Create VM
 Write-Verbose 'Creating VM...'
-$vm = New-VM -Name $VMName -Generation 2 -MemoryStartupBytes $MemoryStartupBytes -VHDPath $vhdxPath -SwitchName $VMSwitchName
+$vm = New-VM -Name $VMName -Path $vmmsSettings.DefaultExternalDataRoot -Generation 2 -MemoryStartupBytes $MemoryStartupBytes -VHDPath $vhdxPath -SwitchName $VMSwitchName
 $vm | Set-VMProcessor -Count $VMProcessorCount
 $vm | Get-VMIntegrationService |
     Where-Object { $_ -is [Microsoft.HyperV.PowerShell.GuestServiceInterfaceComponent] } |
@@ -68,6 +70,10 @@ $vm | Start-VM
 Write-Verbose 'Waiting for VM integration services...'
 Wait-VM -Name $vmName -For Heartbeat
 
+If ($AddToCluster){
+Write-Verbose 'Adding to Cluster'
+Add-ClusterVirtualMachineRole -VirtualMachine $VMName
+}
 # Return the VM created.
 Write-Verbose 'All done!'
 $vm
